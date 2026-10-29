@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "axis=x": { "model": "mazmorra_umbral:block/portal_del_umbral_x" },
+    "axis=z": { "model": "mazmorra_umbral:block/portal_del_umbral_z" }
+  }
+}

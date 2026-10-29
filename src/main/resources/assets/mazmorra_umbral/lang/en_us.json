@@ -1,0 +1,8 @@
+{
+  "block.mazmorra_umbral.piedra_del_umbral": "Threshold Stone",
+  "block.mazmorra_umbral.portal_del_umbral": "Threshold Portal",
+  "item.mazmorra_umbral.fragmento_del_umbral": "Threshold Fragment",
+  "message.mazmorra_umbral.portal_invalido": "Invalid frame: you need a vertical rectangle of Threshold Stone with a clear interior of at least 2x3.",
+  "message.mazmorra_umbral.portal_no_aqui": "You cannot light a portal inside the Threshold.",
+  "message.mazmorra_umbral.sin_dimension": "The Threshold dimension is not available. Contact the server administrator."
+}

@@ -1,0 +1,8 @@
+{
+  "block.mazmorra_umbral.piedra_del_umbral": "Piedra del Umbral",
+  "block.mazmorra_umbral.portal_del_umbral": "Portal del Umbral",
+  "item.mazmorra_umbral.fragmento_del_umbral": "Fragmento del Umbral",
+  "message.mazmorra_umbral.portal_invalido": "El marco no es válido: necesitas un rectángulo vertical de Piedra del Umbral con interior libre de al menos 2x3.",
+  "message.mazmorra_umbral.portal_no_aqui": "No puedes encender un portal dentro del Umbral.",
+  "message.mazmorra_umbral.sin_dimension": "La dimensión del Umbral no está disponible. Avisa al administrador."
+}

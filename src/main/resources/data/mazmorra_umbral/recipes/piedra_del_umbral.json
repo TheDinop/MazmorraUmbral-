@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "OA",
+    "AO"
+  ],
+  "key": {
+    "O": { "item": "minecraft:obsidian" },
+    "A": { "item": "minecraft:amethyst_shard" }
+  },
+  "result": { "item": "mazmorra_umbral:piedra_del_umbral", "count": 2 }
+}

@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="mazmorra_umbral"
+version="1.0-fase1"
+displayName="Mazmorra del Umbral"
+description='''
+Expansión de mazmorra de ocho pisos para Prominence II: Classic (Minecraft 1.20.1).
+Fase 1: Piedra del Umbral, Fragmento del Umbral, Portal del Umbral, dimensión del Umbral y estado persistente.
+'''
+
+[[dependencies.mazmorra_umbral]]
+modId="forge"
+mandatory=true
+versionRange="[47.2.0,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.mazmorra_umbral]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"

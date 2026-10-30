@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "mazmorra_umbral:block/ascenso_del_umbral"
+  }
+}

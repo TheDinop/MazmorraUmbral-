@@ -5,6 +5,8 @@ import com.mazmorraumbral.config.UmbralConfig;
 import com.mazmorraumbral.registry.ModBlocks;
 import com.mazmorraumbral.registry.ModDimensions;
 import com.mazmorraumbral.state.UmbralSavedData;
+import com.mazmorraumbral.world.FloorBuilder;
+import com.mazmorraumbral.world.UmbralLayout;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
@@ -15,22 +17,22 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.portal.PortalInfo;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.util.ITeleporter;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Entrada y salida de la dimensión del Umbral. La muerte, el cierre del juego o un fallo no tocan el
- * registro del jugador: solo se escribe al entrar (posición de retorno).
+ * Entrada, salida y cambio de piso. La muerte, el cierre del juego o un fallo no tocan el registro del jugador:
+ * solo se escribe al entrar (posición de retorno y portal de origen) y al subir de piso.
  */
 public final class UmbralTeleporter {
-    private static final BlockPos PLATAFORMA = new BlockPos(0, 64, 0);
-    private static final Vec3 LLEGADA = new Vec3(0.5D, 65.0D, 2.5D);
 
     private UmbralTeleporter() {
     }
@@ -38,8 +40,7 @@ public final class UmbralTeleporter {
     /** Se difiere al final del tick para no cambiar de dimensión en mitad de las colisiones. */
     public static void programar(ServerPlayer player) {
         player.setPortalCooldown();
-        MinecraftServer server = player.server;
-        server.execute(() -> {
+        player.server.execute(() -> {
             if (player.isRemoved() || player.hasDisconnected()) {
                 return;
             }
@@ -54,38 +55,91 @@ public final class UmbralTeleporter {
         UmbralSavedData.Registro registro = data.registro(player.getUUID());
 
         if (origen.dimension().equals(ModDimensions.UMBRAL)) {
-            ServerLevel destino = server.overworld();
-            BlockPos pos = destino.getSharedSpawnPos();
-            if (registro.retornoDimension != null) {
-                ResourceLocation loc = ResourceLocation.tryParse(registro.retornoDimension);
-                ServerLevel guardado = loc == null ? null
-                        : server.getLevel(ResourceKey.create(Registries.DIMENSION, loc));
-                if (guardado != null) {
-                    destino = guardado;
-                    pos = registro.posicionRetorno();
-                }
-            }
-            mover(player, destino, Vec3.atBottomCenterOf(pos), player.getYRot());
-            if (UmbralConfig.LOG_DEPURACION.get()) {
-                MazmorraUmbral.LOGGER.info("{} sale del Umbral hacia {}", player.getGameProfile().getName(),
-                        destino.dimension().location());
-            }
+            salir(player, server, data, registro);
         } else {
-            ServerLevel umbral = server.getLevel(ModDimensions.UMBRAL);
-            if (umbral == null) {
-                player.displayClientMessage(Component.translatable("message.mazmorra_umbral.sin_dimension"), false);
-                MazmorraUmbral.LOGGER.error("La dimensión {} no está cargada; revisa el datapack del mod.",
-                        ModDimensions.UMBRAL.location());
-                return;
+            entrar(player, server, origen, data, registro);
+        }
+    }
+
+    private static void entrar(ServerPlayer player, MinecraftServer server, ServerLevel origen, UmbralSavedData data,
+                               UmbralSavedData.Registro registro) {
+        ServerLevel umbral = server.getLevel(ModDimensions.UMBRAL);
+        if (umbral == null) {
+            player.displayClientMessage(Component.translatable("message.mazmorra_umbral.sin_dimension"), false);
+            MazmorraUmbral.LOGGER.error("La dimensión {} no está cargada; revisa el datapack del mod.",
+                    ModDimensions.UMBRAL.location());
+            return;
+        }
+        int piso = Math.max(1, Math.min(UmbralLayout.MAX_PISO, registro.pisoActual));
+        FloorBuilder.asegurar(umbral, data, piso);
+
+        String dimensionOrigen = origen.dimension().location().toString();
+        registro.guardarRetorno(dimensionOrigen, player.blockPosition());
+        registro.guardarPortal(dimensionOrigen, player.blockPosition());
+        registro.expedicionIniciada = true;
+        data.setDirty();
+
+        mover(player, umbral, UmbralLayout.llegada(piso), 0.0F);
+        anunciarPiso(player, piso);
+        if (UmbralConfig.LOG_DEPURACION.get()) {
+            MazmorraUmbral.LOGGER.info("{} entra al Umbral (piso {})", player.getGameProfile().getName(), piso);
+        }
+    }
+
+    private static void salir(ServerPlayer player, MinecraftServer server, UmbralSavedData data,
+                              UmbralSavedData.Registro registro) {
+        ServerLevel destino = server.overworld();
+        BlockPos pos = destino.getSharedSpawnPos();
+        if (registro.retornoDimension != null) {
+            ResourceLocation loc = ResourceLocation.tryParse(registro.retornoDimension);
+            ServerLevel guardado = loc == null ? null
+                    : server.getLevel(ResourceKey.create(Registries.DIMENSION, loc));
+            if (guardado != null) {
+                destino = guardado;
+                pos = registro.posicionRetorno();
             }
-            asegurarPlataforma(umbral);
-            registro.guardarRetorno(origen.dimension().location().toString(), player.blockPosition());
-            registro.expedicionIniciada = true;
+        }
+        mover(player, destino, Vec3.atBottomCenterOf(pos), player.getYRot());
+        if (UmbralConfig.LOG_DEPURACION.get()) {
+            MazmorraUmbral.LOGGER.info("{} sale del Umbral hacia {}", player.getGameProfile().getName(),
+                    destino.dimension().location());
+        }
+        if (registro.vaultReclamado) {
+            colapsarPortal(server, registro);
+            player.displayClientMessage(Component.translatable("message.mazmorra_umbral.umbral_del_vacio"), false);
+        }
+    }
+
+    /** Cambia de piso dentro de la dimensión: solo el bloque de ascenso (que solo existe tras limpiar el piso). */
+    public static void subirDePiso(ServerPlayer player, BlockPos bloque) {
+        ServerLevel nivel = player.serverLevel();
+        if (!nivel.dimension().equals(ModDimensions.UMBRAL)) {
+            return;
+        }
+        int piso = UmbralLayout.pisoDe(bloque);
+        if (piso < 1 || piso >= UmbralLayout.MAX_PISO) {
+            return;
+        }
+        int siguiente = piso + 1;
+        UmbralSavedData data = UmbralSavedData.get(player.server);
+        FloorBuilder.asegurar(nivel, data, siguiente);
+
+        UmbralSavedData.Registro registro = data.registro(player.getUUID());
+        if (siguiente > registro.pisoActual) {
+            registro.pisoActual = siguiente;
             data.setDirty();
-            mover(player, umbral, LLEGADA, 180.0F);
-            if (UmbralConfig.LOG_DEPURACION.get()) {
-                MazmorraUmbral.LOGGER.info("{} entra al Umbral", player.getGameProfile().getName());
-            }
+        }
+        Vec3 llegada = UmbralLayout.llegada(siguiente);
+        player.teleportTo(nivel, llegada.x, llegada.y, llegada.z, 0.0F, 0.0F);
+        player.setPortalCooldown();
+        anunciarPiso(player, siguiente);
+    }
+
+    private static void anunciarPiso(ServerPlayer player, int piso) {
+        player.displayClientMessage(Component.translatable("message.mazmorra_umbral.entras_piso", piso,
+                Component.translatable("piso.mazmorra_umbral." + piso)), true);
+        if (piso == 1) {
+            player.displayClientMessage(Component.translatable("message.mazmorra_umbral.tutorial"), false);
         }
     }
 
@@ -101,33 +155,40 @@ public final class UmbralTeleporter {
     }
 
     /**
-     * Plataforma 9x9 con el portal de regreso. Es temporal: los ocho pisos reales llegarán en fases
-     * posteriores como estructuras. Solo escribe dentro de la dimensión propia del mod.
+     * Umbral del Vacío: la energía del portal por el que el jugador entró colapsa (los bloques de portal se
+     * eliminan); el marco de Piedra del Umbral permanece. Para volver a entrar hace falta otro Fragmento.
      */
-    private static void asegurarPlataforma(ServerLevel umbral) {
-        if (umbral.getBlockState(PLATAFORMA).is(Blocks.STONE_BRICKS)) {
+    private static void colapsarPortal(MinecraftServer server, UmbralSavedData.Registro registro) {
+        if (registro.portalDimension == null) {
             return;
         }
-        for (int x = -4; x <= 4; x++) {
-            for (int z = -4; z <= 4; z++) {
-                umbral.setBlock(new BlockPos(x, 64, z), Blocks.STONE_BRICKS.defaultBlockState(), 3);
+        ResourceLocation loc = ResourceLocation.tryParse(registro.portalDimension);
+        ServerLevel nivel = loc == null ? null : server.getLevel(ResourceKey.create(Registries.DIMENSION, loc));
+        if (nivel == null) {
+            return;
+        }
+        BlockPos base = BlockPos.of(registro.portalPosicion);
+        Set<BlockPos> visitados = new HashSet<>();
+        Deque<BlockPos> cola = new ArrayDeque<>();
+        for (BlockPos p : BlockPos.betweenClosed(base.offset(-2, -2, -2), base.offset(2, 2, 2))) {
+            if (nivel.getBlockState(p).is(ModBlocks.PORTAL_DEL_UMBRAL.get())) {
+                BlockPos fijo = p.immutable();
+                if (visitados.add(fijo)) {
+                    cola.add(fijo);
+                }
             }
         }
-        BlockState piedra = ModBlocks.PIEDRA_DEL_UMBRAL.get().defaultBlockState();
-        int z = -3;
-        for (int y = 64; y <= 68; y++) {
-            umbral.setBlock(new BlockPos(-2, y, z), piedra, 3);
-            umbral.setBlock(new BlockPos(1, y, z), piedra, 3);
-        }
-        for (int x = -1; x <= 0; x++) {
-            umbral.setBlock(new BlockPos(x, 64, z), piedra, 3);
-            umbral.setBlock(new BlockPos(x, 68, z), piedra, 3);
-        }
-        BlockState portal = ModBlocks.PORTAL_DEL_UMBRAL.get().defaultBlockState()
-                .setValue(UmbralPortalBlock.AXIS, Direction.Axis.X);
-        for (int x = -1; x <= 0; x++) {
-            for (int y = 65; y <= 67; y++) {
-                umbral.setBlock(new BlockPos(x, y, z), portal, 18);
+        int quitados = 0;
+        while (!cola.isEmpty() && quitados < 600) {
+            BlockPos p = cola.poll();
+            nivel.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+            quitados++;
+            for (Direction d : Direction.values()) {
+                BlockPos vecino = p.relative(d);
+                if (!visitados.contains(vecino) && nivel.getBlockState(vecino).is(ModBlocks.PORTAL_DEL_UMBRAL.get())) {
+                    visitados.add(vecino);
+                    cola.add(vecino);
+                }
             }
         }
     }

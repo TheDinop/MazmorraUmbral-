@@ -1,0 +1,33 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "minecraft:golden_carrot"
+    },
+    {
+      "item": "mazmorra_umbral:corazon_dorado_umbral"
+    },
+    {
+      "item": "mazmorra_umbral:prisma_convergencia"
+    },
+    {
+      "item": "mazmorra_umbral:prisma_convergencia"
+    },
+    {
+      "item": "mazmorra_umbral:polvo_arcano"
+    },
+    {
+      "item": "mazmorra_umbral:polvo_arcano"
+    },
+    {
+      "item": "mazmorra_umbral:polvo_arcano"
+    },
+    {
+      "item": "mazmorra_umbral:polvo_arcano"
+    }
+  ],
+  "result": {
+    "item": "mazmorra_umbral:zanahoria_dorada_umbral"
+  }
+}

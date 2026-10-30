@@ -1,36 +1,32 @@
-name: Compilar Mazmorra del Umbral
+name: Compilar mod
 
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
 
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Descargar el proyecto
-        uses: actions/checkout@v4
-      - name: Configurar Java 17
+      - uses: actions/checkout@v4
+
+      - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-      - name: Configurar Gradle 8.8
-        uses: gradle/actions/setup-gradle@v4
+          java-version: 17
+
+      - name: Gradle 8.1.1
+        uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.8'
-      - name: Compilar mod Forge
+          gradle-version: 8.1.1
+
+      - name: Compilar
         run: gradle build --no-daemon
-      - name: Mostrar JAR generado
-        run: find build/libs -maxdepth 1 -type f -name '*.jar' -printf '%f\n'
-      - name: Guardar JAR compilado como artefacto
+
+      - name: Subir el .jar
         uses: actions/upload-artifact@v4
         with:
-          name: mazmorra-umbral-fase1
-          path: build/libs/*-1.0-fase1.jar
-          if-no-files-found: error
-          retention-days: 14
+          name: mazmorra_umbral-jar
+          path: build/libs/*.jar

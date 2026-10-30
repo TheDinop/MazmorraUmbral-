@@ -1,52 +1,72 @@
 plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
 }
 
-group = 'com.mazmorraumbral'
-version = '1.0-fase1'
+version = mod_version
+group = mod_group_id
 
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(17)
+base {
+    archivesName = mod_id
 }
 
+// Minecraft 1.20.1 requiere Java 17.
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
 minecraft {
-    mappings channel: 'official', version: '1.20.1'
-    copyIdeResources = true
+    mappings channel: 'official', version: minecraft_version
 
     runs {
         configureEach {
             workingDirectory project.file('run')
-            property 'forge.logging.console.level', 'info'
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
             mods {
-                mazmorra_umbral {
+                "${mod_id}" {
                     source sourceSets.main
                 }
             }
         }
-        client {}
-        server {}
+
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
     }
 }
 
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
 repositories {
-    mavenCentral()
+    // Integraciones con otros mods (Apotheosis, Ars Nouveau, etc.) se añadirán en fases posteriores
+    // como compileOnly/opcionales, nunca como dependencia obligatoria.
 }
 
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.20.1-47.4.5'
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 }
 
-jar {
+tasks.named('jar', Jar).configure {
     manifest {
         attributes([
-            'Specification-Title': 'mazmorra_umbral',
-            'Specification-Vendor': 'mazmorraumbral',
-            'Specification-Version': '1',
-            'Implementation-Title': project.name,
-            'Implementation-Version': project.version
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : 'Mazmorra del Umbral',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'   : project.jar.archiveVersion,
+                'Implementation-Vendor'   : 'Mazmorra del Umbral',
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
+    finalizedBy 'reobfJar'
 }
 
-// ForgeGradle reobfuscates the production jar for Minecraft's runtime names.
-jar.finalizedBy('reobfJar')
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

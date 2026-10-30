@@ -4,7 +4,7 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="mazmorra_umbral"
-version="1.0-fase1"
+version="${file.jarVersion}"
 displayName="Mazmorra del Umbral"
 description='''
 Expansión de mazmorra de ocho pisos para Prominence II: Classic (Minecraft 1.20.1).
